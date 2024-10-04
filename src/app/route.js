@@ -1,4 +1,4 @@
-import { PHP_EXEC } from "@/MODULE/PHP.js";
+import { PHP_EXEC } from "../MODULE/PHP.js";
 
 export async function GET(req, res) {
 	try {
