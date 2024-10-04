@@ -1,6 +1,3 @@
-import { stderr, stdout } from "process";
-
-const fs = require("fs").promises;
 const { exec } = require("child_process");
 
 export async function GET(req, res) {
