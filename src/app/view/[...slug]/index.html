@@ -1,9 +1,205 @@
 <!DOCTYPE html>
 <HTML>
 	<HEAD>
-		<TITLE></TITLE>
+		<TITLE>ビュワー</TITLE>
+
+		<STYLE>
+			:root{
+				--SIDE_HEADER_WIDTH: 200px;
+			}
+
+			body{
+				margin: 0px;
+			}
+
+			.ALL_IMAGE{
+				position: absolute;
+				top: 0px;
+				left: 0px;
+
+				width: var(--SIDE_HEADER_WIDTH);
+				height: 100vh;
+
+				overflow: scroll;
+
+				border-right: solid 1px;
+			}
+
+			.MAIN{
+				position: absolute;
+				top: 0px;
+				left: var(--SIDE_HEADER_WIDTH);
+
+				width: calc(100vw - var(--SIDE_HEADER_WIDTH) - 1px);
+				height: 100vh;
+
+				overflow: hidden;
+				
+				background-color: black;
+
+				text-align: center;
+			}
+
+			.MAIN > img{
+				width: auto;
+				height: 100%;
+			}
+
+			.LOADING{
+				position: fixed;
+				top: 0px;
+				left: 0px;
+
+				width: 100vw;
+				height: 100vh;
+
+				background-color: rgba(0, 0, 0, 0.5);
+
+				text-align: center;
+			}
+
+			.LOADING > .TEXT{
+				font-size: 50px;
+				color: white;
+			}
+
+			.LOADING > .LOG{
+				width: calc(100% - 100px);
+				height: 500px;
+			}
+		</STYLE>
 	</HEAD>
 	<BODY>
-		
+		<DIV CLASS="SIDE_HEADER" ID="SIDE_HEADER">
+			<DIV CLASS="ALL_IMAGE" ID="ALL_IMAGE"></DIV>
+		</DIV>
+		<DIV CLASS="MAIN" ID="MAIN">
+			<IMG ID="VIEWER">
+		</DIV>
+
+		<!--ロード画面-->
+		<DIV CLASS="LOADING" ID="LOADING">
+			<DIV CLASS="TEXT">
+				読み込んでいます。。。
+			</DIV>
+			<TEXTAREA CLASS="LOG" ID="LOG"></TEXTAREA>
+		</DIV>
 	</BODY>
 </HTML>
+<SCRIPT>
+	const BASE_PATH = "/view";
+	const IMG_PATH = window.location.pathname.replace(BASE_PATH, "");
+
+	let IMAGE_THUMBNAIL_LIST = null;
+	let IMAGE_LIST = [];
+	let IMAGE_INDEX = 0;
+	let EL = {
+		ALL_IMAGE: document.getElementById("ALL_IMAGE"),
+		VIEWER: document.getElementById("VIEWER"),
+		LOADING: {
+			PARENT: document.getElementById("LOADING"),
+			LOG: document.getElementById("LOADING").querySelector("#LOG")
+		}
+	}
+
+	window.addEventListener("load", async (E) => {
+		//読み込み画面のログをクリア
+		EL.LOADING.LOG.value = "";
+
+		IMAGE_THUMBNAIL_LIST = await GET_IMAGE_LIST(IMG_PATH);
+
+		//画像を表示
+		EL.VIEWER.src = `/API/GetImage?PATH=${IMG_PATH}&I=${IMAGE_INDEX}`;
+
+		//サムネを表示
+		for (let I = 0; I < IMAGE_THUMBNAIL_LIST.LIST.length; I++) {
+			const IMAGE = IMAGE_THUMBNAIL_LIST.LIST[I];
+			EL.ALL_IMAGE.innerHTML += `
+				<DIV>
+					<IMG SRC="/API/GetThumbnail?PATH=${IMG_PATH}&I=${I}">
+					<DIV>
+						${IMAGE.NAME}
+					</DIV>
+				</DIV>
+			`;
+
+			LOG_PRINT(`[  OK  ]サムネイル：${I}番目を読み込みました`);
+		}
+
+		//画像本体を読み込み
+		for (let I = 0; I < IMAGE_THUMBNAIL_LIST.LIST.length; I++) {
+			const IMAGE = await GET_IMAGE(IMG_PATH, I);
+			if (IMAGE != null) {
+				IMAGE_LIST.push(`data:${IMAGE.MIME};base64,${IMAGE.DATA}`);
+
+				LOG_PRINT(`[  OK  ]本体：${I}番目を読み込みました`);
+			}
+		}
+
+		//読み込み完了
+		EL.LOADING.PARENT.style.display = "none";
+	});
+
+	function LOG_PRINT(TEXT) {
+		EL.LOADING.LOG.value += `${TEXT}\n`;
+		EL.LOADING.LOG.scrollTop = EL.LOADING.LOG.scrollHeight;
+	}
+
+	window.addEventListener("keydown", (E) => {
+		switch(E.key) {
+			case "ArrowUp":
+			case "ArrowLeft": {
+				if (IMAGE_INDEX >= 1) {
+					IMAGE_INDEX--;
+
+					//画像を表示
+					EL.VIEWER.src = IMAGE_LIST[IMAGE_INDEX];
+				}
+				break;
+			}
+
+			case "ArrowDown":
+			case "ArrowRight": {
+				if (IMAGE_INDEX <= IMAGE_LIST.length - 1) {
+					IMAGE_INDEX++;
+
+					//画像を表示
+					EL.VIEWER.src = IMAGE_LIST[IMAGE_INDEX];
+				}
+				break;
+			}
+		}
+	});
+
+	async function GET_IMAGE_LIST(PATH) {
+		let AJAX = await fetch("/API/GetALL_IMAGE?PATH=" + PATH);
+		const RESULT = await AJAX.json();
+
+		if (RESULT.STATUS) {
+			return {
+				"NAME": RESULT.NAME,
+				"LIST": RESULT.LIST
+			}
+		} else {
+			return null;
+		}
+	}
+
+	async function GET_IMAGE(PATH, I) {
+		let AJAX = await fetch(`/API/GetImage?PATH=${PATH}&I=${I}`);
+
+		if (AJAX.ok) {
+			const ARRAY_BUFFER = await AJAX.arrayBuffer();
+			const BYTE_ARRAY = new Uint8Array(ARRAY_BUFFER);
+			const BINARY_STRING = BYTE_ARRAY.reduce((DATA, BYTE) => DATA + String.fromCharCode(BYTE), "");
+			const Base64DATA = btoa(BINARY_STRING);
+
+			return {
+				"DATA": Base64DATA,
+				"MIME": AJAX.headers.get("Content-Type")
+			}
+		} else {
+			return null;
+		}
+	}
+</SCRIPT>
