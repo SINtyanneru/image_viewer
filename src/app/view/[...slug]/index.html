@@ -107,7 +107,9 @@
 		EL.LOADING.LOG.value = "";
 
 		//キャッシュの準備を開始する
+		LOG_PRINT(`[ **** ]キャッシュを準備中です`);
 		await DONE_CACHE(IMG_PATH);
+		LOG_PRINT(`[  OK  ]キャッシュが生成されました`);
 
 		IMAGE_THUMBNAIL_LIST = await GET_IMAGE_LIST(IMG_PATH);
 
@@ -117,16 +119,17 @@
 		//サムネを表示
 		for (let I = 0; I < IMAGE_THUMBNAIL_LIST.LIST.length; I++) {
 			const IMAGE = IMAGE_THUMBNAIL_LIST.LIST[I];
+
+			LOG_PRINT(`[  OK  ]サムネイル：${I}番目を読み込みました`);
+
 			EL.ALL_IMAGE.innerHTML += `
-				<DIV>
+				<DIV ID="THMB_ITEM-${I}">
 					<IMG SRC="/API/GetThumbnail?PATH=${IMG_PATH}&I=${I}">
 					<DIV>
 						${IMAGE.NAME}
 					</DIV>
 				</DIV>
 			`;
-
-			LOG_PRINT(`[  OK  ]サムネイル：${I}番目を読み込みました`);
 		}
 
 		//画像本体を読み込み
