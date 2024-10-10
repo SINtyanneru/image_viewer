@@ -106,6 +106,9 @@
 		//読み込み画面のログをクリア
 		EL.LOADING.LOG.value = "";
 
+		//キャッシュの準備を開始する
+		await DONE_CACHE(IMG_PATH);
+
 		IMAGE_THUMBNAIL_LIST = await GET_IMAGE_LIST(IMG_PATH);
 
 		//画像を表示
@@ -170,6 +173,17 @@
 			}
 		}
 	});
+
+	async function DONE_CACHE(PATH) {
+		let AJAX = await fetch("/API/Cache?PATH=" + PATH);
+		const RESULT = await AJAX.json();
+
+		if (RESULT.STATUS) {
+			return true
+		} else {
+			return false;
+		}
+	}
 
 	async function GET_IMAGE_LIST(PATH) {
 		let AJAX = await fetch("/API/GetALL_IMAGE?PATH=" + PATH);

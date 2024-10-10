@@ -1,19 +1,17 @@
 import { NextResponse } from "next/server";
-import { fileTypeFromBuffer } from "file-type";
 
 import { GET_CACHE } from "../../../MODULE/ImageCache";
 
 export async function GET(req, res) {
 	const PARAM = new URLSearchParams(new URL(req.url).search);
 
-	if (PARAM.get("PATH") != null && PARAM.get("I") != null) {
-		const DATA = await GET_CACHE(PARAM.get("PATH"), PARAM.get("I"), true);
-		const MIME = await fileTypeFromBuffer(DATA);
+	if (PARAM.get("PATH") != null) {
+		await GET_CACHE(PARAM.get("PATH"), 0, false);
 
-		return new Response(DATA, {
+		return new Response(JSON.stringify({"STATUS": true}), {
 			status: 200,
 			headers: {
-				"Content-Type": MIME.mime
+				"Content-Type": "application/json"
 			}
 		});
 	} else {
