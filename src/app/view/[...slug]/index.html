@@ -45,12 +45,15 @@
 				top: 0px;
 				right: 0px;
 
-				width: 100px;
-				height: 100px;
+				width: fit-content;
+				height: fit-content;
 
 				color: white;
+				background-color: rgba(0, 0, 0, 0.5);
 
 				font-size: 30px;
+
+				margin: 10px;
 			}
 
 			.MAIN > img{
@@ -80,6 +83,20 @@
 				width: calc(100% - 100px);
 				height: 500px;
 			}
+
+			.HELP {
+				position: fixed;
+				top: 0px;
+				left: 0px;
+
+				width: 100vw;
+				height: 100vh;
+
+				color: white;
+				background-color: rgba(0, 0, 0, 0.9);
+
+				text-align: center;
+			}
 		</STYLE>
 	</HEAD>
 	<BODY>
@@ -100,6 +117,42 @@
 				読み込んでいます。。。
 			</DIV>
 		</DIV>
+
+		<!--ヘルプ-->
+		<DIV CLASS="HELP" ID="HELP" STYLE="display: none;">
+			<H1>ヘルプ</H1>
+			<HR>
+			<TABLE>
+				<TR>
+					<TD>[←]</TD>
+					<TD>ページを戻る</TD>
+				</TR>
+				<TR>
+					<TD>[↑]</TD>
+					<TD>ページを戻る</TD>
+				</TR>
+				<TR>
+					<TD>[→]</TD>
+					<TD>ページを進む</TD>
+				</TR>
+				<TR>
+					<TD>[↓]</TD>
+					<TD>ページを進む</TD>
+				</TR>
+				<TR>
+					<TD>[Home]</TD>
+					<TD>1ページ目へ飛ぶ</TD>
+				</TR>
+				<TR>
+					<TD>[End]</TD>
+					<TD>最終ページへ飛ぶ</TD>
+				</TR>
+				<TR>
+					<TD>[Ctrl] + [/(?)]</TD>
+					<TD>ヘルプを開く(もう一度押すと閉じます)</TD>
+				</TR>
+			</TABLE>
+		</DIV>
 	</BODY>
 </HTML>
 <SCRIPT>
@@ -114,6 +167,7 @@
 		ALL_IMAGE: document.getElementById("ALL_IMAGE"),
 		VIEWER: document.getElementById("VIEWER"),
 		PAGE_NUM: document.getElementById("PAGE_NUM"),
+		HELP: document.getElementById("HELP"),
 		LOADING: {
 			PARENT: document.getElementById("LOADING"),
 		}
@@ -154,25 +208,57 @@
 
 
 	window.addEventListener("keydown", (E) => {
+		//ヘルプ
+		if (E.key === "/" && E.ctrlKey) {
+			if (EL.HELP.style.display === "block") {
+				EL.HELP.style.display = "none";
+			} else {
+				EL.HELP.style.display = "block";
+			}
+		}
+
+		//ヘルプを開いてるならここで止まる
+		if (EL.HELP.style.display === "block") {
+			return;
+		}
+
 		switch(E.key) {
+			//最初の頁へ行く
+			case "Home": {
+				IMAGE_INDEX = 0;
+				break;
+			}
+
+			//最終ページへ行く
+			case "End": {
+				IMAGE_INDEX = IMAGE_LENGTH - 1;
+				break;
+			}
+
+			//ページを戻る
 			case "ArrowUp":
 			case "ArrowLeft": {
 				if (IMAGE_INDEX >= 1) {
 					IMAGE_INDEX--;
 
-					//ページ番号を表示
-					EL.PAGE_NUM.innerText = `${IMAGE_LENGTH}/${IMAGE_INDEX}`;
+					//ページ番号を表示?
+					EL.PAGE_NUM.innerText = `${IMAGE_LENGTH + 1}/${IMAGE_INDEX + 1}`;
+				} else {
+					EL.PAGE_NUM.innerText = "1ページ";
 				}
 				break;
 			}
 
+			//ページを進む
 			case "ArrowDown":
 			case "ArrowRight": {
 				if (IMAGE_INDEX <= IMAGE_LENGTH - 2) {
 					IMAGE_INDEX++;
 
 					//ページ番号を表示
-					EL.PAGE_NUM.innerText = `${IMAGE_LENGTH}/${IMAGE_INDEX}`;
+					EL.PAGE_NUM.innerText = `${IMAGE_LENGTH + 1}/${IMAGE_INDEX + 1}`;
+				} else {
+					EL.PAGE_NUM.innerText = "最終ページ";
 				}
 				break;
 			}
@@ -181,6 +267,8 @@
 
 	window.addEventListener("keyup", async (E) => {
 		switch(E.key) {
+			case "Home":
+			case "End":
 			case "ArrowUp":
 			case "ArrowDown":
 			case "ArrowLeft":
