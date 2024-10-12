@@ -40,6 +40,19 @@
 				text-align: center;
 			}
 
+			.MAIN > .PAGE_NUM{
+				position: fixed;
+				top: 0px;
+				right: 0px;
+
+				width: 100px;
+				height: 100px;
+
+				color: white;
+
+				font-size: 30px;
+			}
+
 			.MAIN > img{
 				width: auto;
 				height: 100%;
@@ -74,6 +87,10 @@
 			<DIV CLASS="ALL_IMAGE" ID="ALL_IMAGE"></DIV>
 		</DIV>
 		<DIV CLASS="MAIN" ID="MAIN">
+			<!--ページ番号-->
+			<DIV CLASS="PAGE_NUM" ID="PAGE_NUM"></DIV>
+
+			<!--画像本体-->
 			<IMG ID="VIEWER">
 		</DIV>
 
@@ -82,7 +99,6 @@
 			<DIV CLASS="TEXT">
 				読み込んでいます。。。
 			</DIV>
-			<TEXTAREA CLASS="LOG" ID="LOG"></TEXTAREA>
 		</DIV>
 	</BODY>
 </HTML>
@@ -90,37 +106,30 @@
 	const BASE_PATH = "/view";
 	const IMG_PATH = window.location.pathname.replace(BASE_PATH, "");
 
+	let IMAGE_LENGTH = 0;
 	let IMAGE_THUMBNAIL_LIST = null;
-	let IMAGE_LIST = [];
+	let IMAGE_LIST = {};
 	let IMAGE_INDEX = 0;
 	let EL = {
 		ALL_IMAGE: document.getElementById("ALL_IMAGE"),
 		VIEWER: document.getElementById("VIEWER"),
+		PAGE_NUM: document.getElementById("PAGE_NUM"),
 		LOADING: {
 			PARENT: document.getElementById("LOADING"),
-			LOG: document.getElementById("LOADING").querySelector("#LOG")
 		}
 	}
 
 	window.addEventListener("load", async (E) => {
-		//読み込み画面のログをクリア
-		EL.LOADING.LOG.value = "";
-
 		//キャッシュの準備を開始する
-		LOG_PRINT(`[ **** ]キャッシュを準備中です`);
 		await DONE_CACHE(IMG_PATH);
-		LOG_PRINT(`[  OK  ]キャッシュが生成されました`);
 
 		IMAGE_THUMBNAIL_LIST = await GET_IMAGE_LIST(IMG_PATH);
 
-		//画像を表示
-		EL.VIEWER.src = `/API/GetImage?PATH=${IMG_PATH}&I=${IMAGE_INDEX}`;
+		IMAGE_LENGTH = IMAGE_THUMBNAIL_LIST.LIST.length;
 
 		//サムネを表示
 		for (let I = 0; I < IMAGE_THUMBNAIL_LIST.LIST.length; I++) {
 			const IMAGE = IMAGE_THUMBNAIL_LIST.LIST[I];
-
-			LOG_PRINT(`[  OK  ]サムネイル：${I}番目を読み込みました`);
 
 			EL.ALL_IMAGE.innerHTML += `
 				<DIV ID="THMB_ITEM-${I}">
@@ -133,23 +142,16 @@
 		}
 
 		//画像本体を読み込み
-		for (let I = 0; I < IMAGE_THUMBNAIL_LIST.LIST.length; I++) {
-			const IMAGE = await GET_IMAGE(IMG_PATH, I);
-			if (IMAGE != null) {
-				IMAGE_LIST.push(`data:${IMAGE.MIME};base64,${IMAGE.DATA}`);
-
-				LOG_PRINT(`[  OK  ]本体：${I}番目を読み込みました`);
-			}
+		const IMAGE = await GET_IMAGE(IMG_PATH, 0);
+		if (IMAGE != null) {
+			//画像を表示
+			EL.VIEWER.src = IMAGE;
 		}
 
 		//読み込み完了
 		EL.LOADING.PARENT.style.display = "none";
 	});
 
-	function LOG_PRINT(TEXT) {
-		EL.LOADING.LOG.value += `${TEXT}\n`;
-		EL.LOADING.LOG.scrollTop = EL.LOADING.LOG.scrollHeight;
-	}
 
 	window.addEventListener("keydown", (E) => {
 		switch(E.key) {
@@ -158,19 +160,39 @@
 				if (IMAGE_INDEX >= 1) {
 					IMAGE_INDEX--;
 
-					//画像を表示
-					EL.VIEWER.src = IMAGE_LIST[IMAGE_INDEX];
+					//ページ番号を表示
+					EL.PAGE_NUM.innerText = `${IMAGE_LENGTH}/${IMAGE_INDEX}`;
 				}
 				break;
 			}
 
 			case "ArrowDown":
 			case "ArrowRight": {
-				if (IMAGE_INDEX <= IMAGE_LIST.length - 1) {
+				if (IMAGE_INDEX <= IMAGE_LENGTH - 2) {
 					IMAGE_INDEX++;
 
+					//ページ番号を表示
+					EL.PAGE_NUM.innerText = `${IMAGE_LENGTH}/${IMAGE_INDEX}`;
+				}
+				break;
+			}
+		}
+	});
+
+	window.addEventListener("keyup", async (E) => {
+		switch(E.key) {
+			case "ArrowUp":
+			case "ArrowDown":
+			case "ArrowLeft":
+			case "ArrowRight": {
+				//ページ番号を消す
+				EL.PAGE_NUM.innerText = "";
+
+				//画像本体を読み込み
+				const IMAGE = await GET_IMAGE(IMG_PATH, IMAGE_INDEX);
+				if (IMAGE != null) {
 					//画像を表示
-					EL.VIEWER.src = IMAGE_LIST[IMAGE_INDEX];
+					EL.VIEWER.src = IMAGE;
 				}
 				break;
 			}
@@ -203,20 +225,25 @@
 	}
 
 	async function GET_IMAGE(PATH, I) {
-		let AJAX = await fetch(`/API/GetImage?PATH=${PATH}&I=${I}`);
+		//キャッシュがあるか
+		if (IMAGE_LIST[I] == null) {
+			let AJAX = await fetch(`/API/GetImage?PATH=${PATH}&I=${I}`);
 
-		if (AJAX.ok) {
-			const ARRAY_BUFFER = await AJAX.arrayBuffer();
-			const BYTE_ARRAY = new Uint8Array(ARRAY_BUFFER);
-			const BINARY_STRING = BYTE_ARRAY.reduce((DATA, BYTE) => DATA + String.fromCharCode(BYTE), "");
-			const Base64DATA = btoa(BINARY_STRING);
+			if (AJAX.ok) {
+				const ARRAY_BUFFER = await AJAX.arrayBuffer();
+				const BYTE_ARRAY = new Uint8Array(ARRAY_BUFFER);
+				const BINARY_STRING = BYTE_ARRAY.reduce((DATA, BYTE) => DATA + String.fromCharCode(BYTE), "");
+				const Base64DATA = btoa(BINARY_STRING);
 
-			return {
-				"DATA": Base64DATA,
-				"MIME": AJAX.headers.get("Content-Type")
+				//画像をキャッシュに
+				IMAGE_LIST[I] = `data:${AJAX.headers.get("Content-Type")};base64,${Base64DATA}`;
+
+				return IMAGE_LIST[I];
+			} else {
+				return null;
 			}
-		} else {
-			return null;
+		} else{
+			return IMAGE_LIST[I];
 		}
 	}
 </SCRIPT>
