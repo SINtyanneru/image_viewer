@@ -56,8 +56,8 @@
 				margin: 10px;
 			}
 
-			.MAIN > img{
-				width: auto;
+			.MAIN > canvas{
+				width: 100%;
 				height: 100%;
 			}
 
@@ -108,7 +108,7 @@
 			<DIV CLASS="PAGE_NUM" ID="PAGE_NUM"></DIV>
 
 			<!--画像本体-->
-			<IMG ID="VIEWER">
+			<CANVAS ID="VIEWER"></CANVAS>
 		</DIV>
 
 		<!--ロード画面-->
@@ -151,6 +151,10 @@
 					<TD>[Ctrl] + [/(?)]</TD>
 					<TD>ヘルプを開く(もう一度押すと閉じます)</TD>
 				</TR>
+				<TR>
+					<TD>[Esc]</TD>
+					<TD>拡大率/位置をリセットします</TD>
+				</TR>
 			</TABLE>
 		</DIV>
 	</BODY>
@@ -163,15 +167,24 @@
 	let IMAGE_THUMBNAIL_LIST = null;
 	let IMAGE_LIST = {};
 	let IMAGE_INDEX = 0;
+	let ZOOM_LEVEL = 0;
+	let POS = {X:0, Y:0};
+	let TEMP = {};
 	let EL = {
 		ALL_IMAGE: document.getElementById("ALL_IMAGE"),
+		MAIN: document.getElementById("MAIN"),
 		VIEWER: document.getElementById("VIEWER"),
+		CTX: document.getElementById("VIEWER").getContext("2d"),
 		PAGE_NUM: document.getElementById("PAGE_NUM"),
 		HELP: document.getElementById("HELP"),
 		LOADING: {
 			PARENT: document.getElementById("LOADING"),
 		}
 	}
+
+	window.addEventListener("resize", (E) =>{
+		DRAW_IMAGE();
+	});
 
 	window.addEventListener("load", async (E) => {
 		//キャッシュの準備を開始する
@@ -195,12 +208,8 @@
 			`;
 		}
 
-		//画像本体を読み込み
-		const IMAGE = await GET_IMAGE(IMG_PATH, 0);
-		if (IMAGE != null) {
-			//画像を表示
-			EL.VIEWER.src = IMAGE;
-		}
+		//画像を読み込み
+		DRAW_IMAGE();
 
 		//読み込み完了
 		EL.LOADING.PARENT.style.display = "none";
@@ -262,6 +271,16 @@
 				}
 				break;
 			}
+
+			//拡大率/位置をリセット
+			case "Escape": {
+				POS.X = 0;
+				POS.Y = 0;
+				ZOOM_LEVEL = 0;
+
+				DRAW_IMAGE();
+				break;
+			}
 		}
 	});
 
@@ -276,16 +295,77 @@
 				//ページ番号を消す
 				EL.PAGE_NUM.innerText = "";
 
-				//画像本体を読み込み
-				const IMAGE = await GET_IMAGE(IMG_PATH, IMAGE_INDEX);
-				if (IMAGE != null) {
-					//画像を表示
-					EL.VIEWER.src = IMAGE;
-				}
+				//画像を読み込み
+				DRAW_IMAGE();
 				break;
 			}
 		}
 	});
+
+
+	//マウスホイール
+	EL.VIEWER.addEventListener("wheel", (E) => {
+		if (E.deltaY > 0) {
+			//下に転がした
+			if (ZOOM_LEVEL >= 1) {
+				ZOOM_LEVEL--;
+
+				DRAW_IMAGE();
+			}
+		} else {
+			//上に転がした
+			ZOOM_LEVEL++;
+
+			DRAW_IMAGE();
+		}
+	})
+
+	//マウスカーソルの真ん中
+	EL.VIEWER.addEventListener("mousemove", (E) => {
+		//真ん中のボタンでドラッグしているか
+		if (E.buttons === 4) {
+			//座標に移動量を足す
+			POS.X += E.movementX;
+			POS.Y += E.movementY;
+
+			DRAW_IMAGE();
+		}
+	});
+
+	async function DRAW_IMAGE() {
+		//CANVASのサイズを設定
+		EL.VIEWER.width = EL.MAIN.clientWidth;
+		EL.VIEWER.height = EL.MAIN.clientHeight;
+
+		function DRAW(IMAGE) {
+			const H = EL.VIEWER.height + (ZOOM_LEVEL * (ZOOM_LEVEL * 100));		//高さ、「CANVASの高さ+ズームレベル」
+			const W = (H / IMAGE.height) * IMAGE.width;			//横幅、「（高さ÷画像の高さ）×画像の横幅」
+			const X = (EL.VIEWER.width - W) / 2 + POS.X;
+			const Y = POS.Y;
+
+			EL.CTX.drawImage(IMAGE, X, Y, W, H);
+		}
+
+		//今読み込んでる画像と、選択している画像が違うなら画像の再読込からする
+		if (TEMP["IMAGE_INDEX_POS"] !== IMAGE_INDEX) {
+			//画像を読み込んで表示
+			const IMAGE = new Image();
+
+			//読み込んだらImage型を渡す
+			IMAGE.addEventListener("load", (E) =>{
+				DRAW(IMAGE);
+
+				//キャッシュを更新
+				TEMP["IMAGE_DATA"] = IMAGE;
+				TEMP["IMAGE_INDEX_POS"] = IMAGE_INDEX;
+			});
+
+			//読み込む
+			IMAGE.src = await GET_IMAGE(IMG_PATH, IMAGE_INDEX);
+		} else {
+			DRAW(TEMP["IMAGE_DATA"]);
+		}
+	}
 
 	async function DONE_CACHE(PATH) {
 		let AJAX = await fetch("/API/Cache?PATH=" + PATH);
