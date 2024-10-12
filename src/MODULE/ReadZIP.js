@@ -15,42 +15,44 @@ export async function Read (PATH, RequestDATA) {
 
 			//ファイルを読み込む
 			ZIPFILE.on("entry", (ENTRY) => {
-				//ディレクトリならその中を読む
-				if (ENTRY.fileName.endsWith("/")) {
-					ZIPFILE.readEntry();
-				} else {
-					if (RequestDATA) {
-						//ファイルの中身を読む
-						ZIPFILE.openReadStream(ENTRY, (EX, RS) => {
-							if (EX) {
-								reject(EX);
-							}
+				//拡張子が画像か
+				if (ENTRY.fileName.endsWith(".png") || ENTRY.fileName.endsWith(".jpg") || ENTRY.fileName.endsWith(".jpeg")) {
+					//ディレクトリならその中を読む
+					if (ENTRY.fileName.endsWith("/")) {
+						ZIPFILE.readEntry();
+					} else {
+						if (RequestDATA) {
+							//ファイルの中身を読む
+							ZIPFILE.openReadStream(ENTRY, (EX, RS) => {
+								if (EX) {
+									reject(EX);
+								}
 
-							let FILE_CONTENT = [];
-							RS.on("data", (CHUNK) => {
-								FILE_CONTENT.push(CHUNK);
-							});
-
-							RS.on("end", () => {
-								IMAGE_LIST.push({
-									"NAME": path.basename(ENTRY.fileName),
-									"MIME": CHECK_MIME(ENTRY.fileName),
-									"DATA": Buffer.concat(FILE_CONTENT).toString("base64")
+								let FILE_CONTENT = [];
+								RS.on("data", (CHUNK) => {
+									FILE_CONTENT.push(CHUNK);
 								});
 
-								ZIPFILE.readEntry();
+								RS.on("end", () => {
+									IMAGE_LIST.push({
+										"NAME": path.basename(ENTRY.fileName),
+										"MIME": CHECK_MIME(ENTRY.fileName),
+										"DATA": Buffer.concat(FILE_CONTENT).toString("base64")
+									});
+								});
 							});
-						});
-					} else {
-						IMAGE_LIST.push({
-							"NAME": path.basename(ENTRY.fileName),
-							"MIME": CHECK_MIME(ENTRY.fileName),
-							"DATA": null
-						});
-
-						ZIPFILE.readEntry();
+						} else {
+							IMAGE_LIST.push({
+								"NAME": path.basename(ENTRY.fileName),
+								"MIME": CHECK_MIME(ENTRY.fileName),
+								"DATA": null
+							});
+						}
 					}
 				}
+
+				//次を読む
+				ZIPFILE.readEntry();
 			});
 
 			//終了
