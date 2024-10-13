@@ -25,6 +25,14 @@
 				border-right: solid 1px;
 			}
 
+			.ALL_IMAGE > .THMB_ITEM{
+				text-align: center;
+			}
+
+			.ALL_IMAGE > .THMB_ITEM[select=true]{
+				background-color: aqua;
+			}
+
 			.MAIN{
 				position: absolute;
 				top: 0px;
@@ -199,7 +207,7 @@
 			const IMAGE = IMAGE_THUMBNAIL_LIST.LIST[I];
 
 			EL.ALL_IMAGE.innerHTML += `
-				<DIV ID="THMB_ITEM-${I}">
+				<DIV CLASS="THMB_ITEM" ID="THMB_ITEM-${I}" onclick="JUMP_PAGE(${I})">
 					<IMG SRC="/API/GetThumbnail?PATH=${IMG_PATH}&I=${I}">
 					<DIV>
 						${IMAGE.NAME}
@@ -213,6 +221,8 @@
 
 		//読み込み完了
 		EL.LOADING.PARENT.style.display = "none";
+
+		THUMB_HAILAIT(0);
 	});
 
 
@@ -235,12 +245,16 @@
 			//最初の頁へ行く
 			case "Home": {
 				IMAGE_INDEX = 0;
+
+				THUMB_HAILAIT(IMAGE_INDEX);
 				break;
 			}
 
 			//最終ページへ行く
 			case "End": {
 				IMAGE_INDEX = IMAGE_LENGTH - 1;
+
+				THUMB_HAILAIT(IMAGE_INDEX);
 				break;
 			}
 
@@ -252,6 +266,8 @@
 
 					//ページ番号を表示?
 					EL.PAGE_NUM.innerText = `${IMAGE_LENGTH + 1}/${IMAGE_INDEX + 1}`;
+
+					THUMB_HAILAIT(IMAGE_INDEX);
 				} else {
 					EL.PAGE_NUM.innerText = "1ページ";
 				}
@@ -266,6 +282,8 @@
 
 					//ページ番号を表示
 					EL.PAGE_NUM.innerText = `${IMAGE_LENGTH + 1}/${IMAGE_INDEX + 1}`;
+
+					THUMB_HAILAIT(IMAGE_INDEX);
 				} else {
 					EL.PAGE_NUM.innerText = "最終ページ";
 				}
@@ -332,13 +350,47 @@
 		}
 	});
 
+	function THUMB_HAILAIT(I) {
+		let THUMB_EL = document.getElementById("THMB_ITEM-" + I);
+		if (THUMB_EL != null) {
+			//前に選択しているページ番号のキャッシュがNullじゃないなら
+			if (TEMP["TH_HAI_OLD_INDEX"] != null) {
+				let OLD_THUMB_EL = document.getElementById("THMB_ITEM-" + TEMP["TH_HAI_OLD_INDEX"]);
+				if (OLD_THUMB_EL != null) {
+					//前に選択していたページのサムネの属性をfalseにする
+					OLD_THUMB_EL.setAttribute("select", false);
+				}
+			}
+
+			//今選択しているサムネに属性を付ける
+			THUMB_EL.setAttribute("select", true);
+
+			//サムネの場所までスクロール
+			THUMB_EL.scrollIntoView({
+				behavior: "smooth"
+			});
+
+
+			//今選択しているページ番号をキャッシュに入れる
+			TEMP["TH_HAI_OLD_INDEX"] = IMAGE_INDEX;
+		}
+	}
+
+	function JUMP_PAGE(I) {
+		IMAGE_INDEX = I;
+
+		THUMB_HAILAIT(I);
+		DRAW_IMAGE();
+	}
+
 	async function DRAW_IMAGE() {
 		//CANVASのサイズを設定
 		EL.VIEWER.width = EL.MAIN.clientWidth;
 		EL.VIEWER.height = EL.MAIN.clientHeight;
 
 		function DRAW(IMAGE) {
-			const H = EL.VIEWER.height + (ZOOM_LEVEL * (ZOOM_LEVEL * 100));		//高さ、「CANVASの高さ+ズームレベル」
+			const ZOOM = (ZOOM_LEVEL * (ZOOM_LEVEL * 100));
+			const H = EL.VIEWER.height + ZOOM;		//高さ、「CANVASの高さ+ズームレベル」
 			const W = (H / IMAGE.height) * IMAGE.width;			//横幅、「（高さ÷画像の高さ）×画像の横幅」
 			const X = (EL.VIEWER.width - W) / 2 + POS.X;
 			const Y = POS.Y;
