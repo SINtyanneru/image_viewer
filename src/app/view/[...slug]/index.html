@@ -178,6 +178,7 @@
 	let ZOOM_LEVEL = 0;
 	let POS = {X:0, Y:0};
 	let TEMP = {};
+	let DRAW_NOW = false;
 	let EL = {
 		ALL_IMAGE: document.getElementById("ALL_IMAGE"),
 		MAIN: document.getElementById("MAIN"),
@@ -268,6 +269,8 @@
 					EL.PAGE_NUM.innerText = `${IMAGE_LENGTH + 1}/${IMAGE_INDEX + 1}`;
 
 					THUMB_HAILAIT(IMAGE_INDEX);
+
+					POS.Y = 0;
 				} else {
 					EL.PAGE_NUM.innerText = "1ページ";
 				}
@@ -284,6 +287,8 @@
 					EL.PAGE_NUM.innerText = `${IMAGE_LENGTH + 1}/${IMAGE_INDEX + 1}`;
 
 					THUMB_HAILAIT(IMAGE_INDEX);
+
+					POS.Y = 0;
 				} else {
 					EL.PAGE_NUM.innerText = "最終ページ";
 				}
@@ -348,6 +353,14 @@
 
 			DRAW_IMAGE();
 		}
+
+		//Leftクリックしながらドラッグしているか
+		if (E.buttons === 1) {
+			//Y軸のみ移動
+			POS.Y += E.movementY;
+
+			DRAW_IMAGE();
+		}
 	});
 
 	function THUMB_HAILAIT(I) {
@@ -384,38 +397,60 @@
 	}
 
 	async function DRAW_IMAGE() {
-		//CANVASのサイズを設定
-		EL.VIEWER.width = EL.MAIN.clientWidth;
-		EL.VIEWER.height = EL.MAIN.clientHeight;
+		if (!DRAW_NOW) {
+			DRAW_NOW = true;
 
-		function DRAW(IMAGE) {
+			//CANVASのサイズを設定
+			if (EL.VIEWER.width !== EL.MAIN.clientWidth || EL.VIEWER.height !== EL.MAIN.clientHeight) {
+				EL.VIEWER.width = EL.MAIN.clientWidth;
+				EL.VIEWER.height = EL.MAIN.clientHeight;
+			}
+
+			const IMAGE = (await GET_IMAGE(IMG_PATH, IMAGE_INDEX)).IMAGE;
 			const ZOOM = (ZOOM_LEVEL * (ZOOM_LEVEL * 100));
 			const H = EL.VIEWER.height + ZOOM;		//高さ、「CANVASの高さ+ズームレベル」
 			const W = (H / IMAGE.height) * IMAGE.width;			//横幅、「（高さ÷画像の高さ）×画像の横幅」
 			const X = (EL.VIEWER.width - W) / 2 + POS.X;
 			const Y = POS.Y;
+			const PAGE = Math.floor(((Y * -1) / H)) + IMAGE_INDEX;
 
-			EL.CTX.drawImage(IMAGE, X, Y, W, H);
-		}
+			if (TEMP["OLD_X_PAGE"] != PAGE) {
+				if (TEMP["OLD_X_PAGE"] < PAGE) {
+					if (IMAGE_INDEX <= IMAGE_LENGTH - 2) {
+						IMAGE_INDEX = PAGE;
 
-		//今読み込んでる画像と、選択している画像が違うなら画像の再読込からする
-		if (TEMP["IMAGE_INDEX_POS"] !== IMAGE_INDEX) {
-			//画像を読み込んで表示
-			const IMAGE = new Image();
+						POS.Y = 0;
+					}
+				}
+				if (TEMP["OLD_X_PAGE"] > PAGE) {
+					if (IMAGE_INDEX >= 1) {
+						IMAGE_INDEX = PAGE;
 
-			//読み込んだらImage型を渡す
-			IMAGE.addEventListener("load", (E) =>{
-				DRAW(IMAGE);
+						POS.Y = H * -1;
+					}
+				}
 
-				//キャッシュを更新
-				TEMP["IMAGE_DATA"] = IMAGE;
-				TEMP["IMAGE_INDEX_POS"] = IMAGE_INDEX;
-			});
+				TEMP["OLD_X_PAGE"] = PAGE;
 
-			//読み込む
-			IMAGE.src = await GET_IMAGE(IMG_PATH, IMAGE_INDEX);
-		} else {
-			DRAW(TEMP["IMAGE_DATA"]);
+				THUMB_HAILAIT(IMAGE_INDEX);
+			}
+
+			if (IMAGE_INDEX <= IMAGE_LENGTH - 2) {
+				const ATO_IMAGE = (await GET_IMAGE(IMG_PATH, IMAGE_INDEX + 1)).IMAGE;
+				const ATO_H = EL.VIEWER.height + ZOOM;
+				const ATO_W = (ATO_H / ATO_IMAGE.height) * ATO_IMAGE.width;
+				const ATO_X = (EL.VIEWER.width - ATO_W) / 2 + POS.X;
+				const ATO_Y = POS.Y + ATO_H;
+
+				EL.CTX.clearRect(0, 0, EL.VIEWER.width, EL.VIEWER.height);
+				EL.CTX.drawImage(IMAGE, X, Y, W, H);
+				EL.CTX.drawImage(ATO_IMAGE, ATO_X, ATO_Y, ATO_W, ATO_H);
+			} else {
+				EL.CTX.clearRect(0, 0, EL.VIEWER.width, EL.VIEWER.height);
+				EL.CTX.drawImage(IMAGE, X, Y, W, H);
+			}
+
+			DRAW_NOW = false;
 		}
 	}
 
@@ -454,11 +489,23 @@
 				const BYTE_ARRAY = new Uint8Array(ARRAY_BUFFER);
 				const BINARY_STRING = BYTE_ARRAY.reduce((DATA, BYTE) => DATA + String.fromCharCode(BYTE), "");
 				const Base64DATA = btoa(BINARY_STRING);
+				const BLOB = `data:${AJAX.headers.get("Content-Type")};base64,${Base64DATA}`;
 
-				//画像をキャッシュに
-				IMAGE_LIST[I] = `data:${AJAX.headers.get("Content-Type")};base64,${Base64DATA}`;
+				return new Promise((resolve) => {
+					const IMAGE = new Image();
 
-				return IMAGE_LIST[I];
+					IMAGE.addEventListener("load", (E) =>{
+						//画像をキャッシュに
+						IMAGE_LIST[I] = {
+							"BLOB": BLOB,
+							"IMAGE": IMAGE
+						};
+					
+						resolve(IMAGE_LIST[I]);
+					});
+
+					IMAGE.src = BLOB;
+				});
 			} else {
 				return null;
 			}
